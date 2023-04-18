@@ -1,12 +1,11 @@
 ﻿using ImageProcessor;
 using ImageProcessor.Plugins.WebP.Imaging.Formats;
-using System.Linq;
 
 namespace conversor_imagem
 {
     public class Program
     {
-        static List<string> tiposDeImagem = new()
+        static readonly List<string> tiposDeImagem = new()
         {
             ".bmp",
             ".gif",
@@ -17,34 +16,56 @@ namespace conversor_imagem
 
         static void Main(string[] args)
         {
-            CrieDiretorioNovo();
-            ConverterImagens();
-            ReplaceImagens();
-            RemoverImagensAntigas();
-        }
-
-        private static void RemoverImagensAntigas()
-        {
-            var imagensAntigas = Directory.GetFiles(Config.PathPastaImagens).Where(c => !Path.GetExtension(c).Contains("webp"));
-            foreach (var imagemAntiga in imagensAntigas)
+            try
             {
-                try
+                var pathImagensRaiz = Config.PathPastaImagens;
+                var diretorios = new List<string>(Directory.GetDirectories(pathImagensRaiz, "*", SearchOption.AllDirectories))
                 {
-                    File.Delete(imagemAntiga);
-                }
-                catch (Exception ex)
+                    pathImagensRaiz
+                };
+
+                foreach (var diretorio in diretorios)
                 {
-                    WriteExceptionLog(ex);
+                    var pathConvertidas = $"{diretorio}\\Converted";
+
+                    Console.WriteLine($"Iniciando conversão do diretório {diretorio}");
+
+                    ConverterImagensParaWebp(diretorio, pathConvertidas);
+
+                    Console.WriteLine($"Diretório {diretorio} covnertido com sucesso");
                 }
             }
-
-            Directory.Delete(Config.PathPastaImagensConvertidas);
+            catch (Exception ex)
+            {
+                WriteExceptionLog(ex);
+            }
         }
 
-        private static void ReplaceImagens()
+        private static void ConverterImagensParaWebp(string pathImagens, string pathImagensConvertidas)
         {
-            var imagensConvertidas = Directory.GetFiles(Config.PathPastaImagensConvertidas);
-            var imagensAntigas = Directory.GetFiles(Config.PathPastaImagens).Where(c => !Path.GetExtension(c).Contains("webp"));
+            CrieDiretorioImagensConvertidas(pathImagensConvertidas);
+            ConverterImagens(pathImagens, pathImagensConvertidas);
+            ReplaceImagens(pathImagens, pathImagensConvertidas);
+            RemoverImagensAntigas(pathImagens, pathImagensConvertidas);
+        }
+
+        private static void RemoverImagensAntigas(string pathImagens, string pathImagensConvertidas)
+        {
+            var imagensAntigas = Directory.GetFiles(pathImagens).Where(c => tiposDeImagem.Contains(Path.GetExtension(c).ToLowerInvariant()));
+            foreach (var imagemAntiga in imagensAntigas)
+            {
+                Console.WriteLine($"Iniciando deleção da imagem {imagemAntiga}");
+                File.Delete(imagemAntiga);
+                Console.WriteLine($"imagem {imagemAntiga} deletada com sucesso");
+            }
+
+            Directory.Delete(pathImagensConvertidas);
+        }
+
+        private static void ReplaceImagens(string pathImagens, string pathImagensConvertidas)
+        {
+            var imagensConvertidas = Directory.GetFiles(pathImagensConvertidas);
+            var imagensAntigas = Directory.GetFiles(pathImagens).Where(c => tiposDeImagem.Contains(Path.GetExtension(c).ToLowerInvariant()));
 
             foreach (var imagemAntiga in imagensAntigas)
             {
@@ -52,16 +73,12 @@ namespace conversor_imagem
                 var imagemConvertida = imagensConvertidas
                     .FirstOrDefault(c => Path.GetFileNameWithoutExtension(c) == nomeArquivo);
 
+
                 if (imagemConvertida != null)
                 {
-                    try
-                    {
-                        File.Move(imagemConvertida, Path.Combine(Path.GetDirectoryName(imagemAntiga), Path.GetFileName(imagemConvertida)), true);
-                    }
-                    catch (Exception ex)
-                    {
-                        WriteExceptionLog(ex);
-                    }
+                    Console.WriteLine($"Iniciando substituição de formato da imagem {imagemAntiga}");
+                    File.Move(imagemConvertida, Path.Combine(Path.GetDirectoryName(imagemAntiga), Path.GetFileName(imagemConvertida)), true);
+                    Console.WriteLine($"Imagem substituida com sucesso!");
                 }
             }
         }
@@ -73,35 +90,40 @@ namespace conversor_imagem
             var logExcecao = new StreamWriter(arquivoLog);
 
             logExcecao.WriteLine(@$"{ex.Message}
-                                        {ex.InnerException}
-                                        {ex.StackTrace}");
+                                    {ex.InnerException}
+                                    {ex.StackTrace}");
 
             logExcecao.Close();
         }
 
-        private static void CrieDiretorioNovo()
+        private static void CrieDiretorioImagensConvertidas(string pathImagensConvertidas)
         {
-            if (!Directory.Exists(Config.PathPastaImagensConvertidas))
+            if (!Directory.Exists(pathImagensConvertidas))
             {
-                Directory.CreateDirectory(Config.PathPastaImagensConvertidas);
+                Directory.CreateDirectory(pathImagensConvertidas);
             }
         }
 
-        private static void ConverterImagens()
+        private static void ConverterImagens(string pathImagens, string pathImagensConvertidas)
         {
-            var pathImagens = Directory.GetFiles(Config.PathPastaImagens).Where(c => tiposDeImagem.Contains(Path.GetExtension(c).ToLowerInvariant()));
+            var imagensAntigas = Directory.GetFiles(pathImagens).Where(c => tiposDeImagem.Contains(Path.GetExtension(c).ToLowerInvariant()));
 
-            foreach (var pathImagem in pathImagens)
+            foreach (var imagemParaConverter in imagensAntigas)
             {
-                using var webPFileStream = new FileStream($"{Config.PathPastaImagensConvertidas}\\{Path.GetFileNameWithoutExtension(pathImagem)}.webp", FileMode.Create);
+                Console.WriteLine($"Iniciando conversão do arquivo {imagemParaConverter}");
+
+                using var webPFileStream = new FileStream($"{pathImagens}\\{Path.GetFileNameWithoutExtension(imagemParaConverter)}.webp", FileMode.Create);
                 using var imageFactory = new ImageFactory(preserveExifData: false);
-                using var file = File.OpenRead(pathImagem);
+                using var file = File.OpenRead(imagemParaConverter);
 
                 imageFactory.Load(file)
                             .Format(new WebPFormat())
                             .Quality(80)
                             .Save(webPFileStream);
+
+                Console.WriteLine($"Arquivo {imagemParaConverter} convertido com sucesso!");
             }
         }
+
     }
 }
