@@ -14,6 +14,9 @@ namespace conversor_imagem
             ".png"
         };
 
+        static int contador;
+        static int maxValue;
+
         static void Main(string[] args)
         {
             try
@@ -24,15 +27,17 @@ namespace conversor_imagem
                     pathImagensRaiz
                 };
 
+                Console.CursorVisible = false;
+                contador = 0;
+                maxValue = diretorios.SelectMany(c => Directory.GetFiles(c))
+                                     .Where(e => tiposDeImagem.Contains(Path.GetExtension(e).ToLowerInvariant())).Count();
+
+                maxValue *= 3;
+
                 foreach (var diretorio in diretorios)
                 {
-                    var pathConvertidas = $"{diretorio}\\Converted";
-
-                    Console.WriteLine($"Iniciando conversão do diretório {diretorio}");
-
+                    var pathConvertidas = $"{diretorio}\\Converted";                    
                     ConverterImagensParaWebp(diretorio, pathConvertidas);
-
-                    Console.WriteLine($"Diretório {diretorio} covnertido com sucesso");
                 }
             }
             catch (Exception ex)
@@ -54,9 +59,12 @@ namespace conversor_imagem
             var imagensAntigas = Directory.GetFiles(pathImagens).Where(c => tiposDeImagem.Contains(Path.GetExtension(c).ToLowerInvariant()));
             foreach (var imagemAntiga in imagensAntigas)
             {
-                Console.WriteLine($"Iniciando deleção da imagem {imagemAntiga}");
                 File.Delete(imagemAntiga);
-                Console.WriteLine($"imagem {imagemAntiga} deletada com sucesso");
+
+                contador++;
+                double porcentagemCompleta = (double)contador / maxValue * 100;
+                Console.SetCursorPosition(0, Console.CursorTop);
+                Console.Write("Progresso: {0}%", porcentagemCompleta.ToString("0.00"));
             }
 
             Directory.Delete(pathImagensConvertidas);
@@ -76,10 +84,13 @@ namespace conversor_imagem
 
                 if (imagemConvertida != null)
                 {
-                    Console.WriteLine($"Iniciando substituição de formato da imagem {imagemAntiga}");
                     File.Move(imagemConvertida, Path.Combine(Path.GetDirectoryName(imagemAntiga), Path.GetFileName(imagemConvertida)), true);
-                    Console.WriteLine($"Imagem substituida com sucesso!");
                 }
+
+                contador++;
+                double porcentagemCompleta = (double)contador / maxValue * 100;
+                Console.SetCursorPosition(0, Console.CursorTop);
+                Console.Write("Progresso: {0}%", porcentagemCompleta.ToString("0.00"));
             }
         }
 
@@ -110,8 +121,6 @@ namespace conversor_imagem
 
             foreach (var imagemParaConverter in imagensAntigas)
             {
-                Console.WriteLine($"Iniciando conversão do arquivo {imagemParaConverter}");
-
                 using var webPFileStream = new FileStream($"{pathImagens}\\{Path.GetFileNameWithoutExtension(imagemParaConverter)}.webp", FileMode.Create);
                 using var imageFactory = new ImageFactory(preserveExifData: false);
                 using var file = File.OpenRead(imagemParaConverter);
@@ -121,7 +130,10 @@ namespace conversor_imagem
                             .Quality(80)
                             .Save(webPFileStream);
 
-                Console.WriteLine($"Arquivo {imagemParaConverter} convertido com sucesso!");
+                contador++;
+                double porcentagemCompleta = (double)contador / maxValue * 100;
+                Console.SetCursorPosition(0, Console.CursorTop);
+                Console.Write("Progresso: {0}%", porcentagemCompleta.ToString("0.00"));
             }
         }
 
